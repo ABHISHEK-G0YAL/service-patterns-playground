@@ -167,3 +167,43 @@ class Notification {
         return userId;
     }
 }
+
+public class NotificationSystem {
+    public static void main(String[] args) {
+        // Create dispatcher
+        Dispatcher dispatcher = new Dispatcher();
+
+        // Create inbox (with dispatcher)
+        Inbox inbox = new Inbox(dispatcher);
+
+        // Set user preferences
+        Preferences prefs = new Preferences(
+                false,   // email
+                false,  // push
+                true   // sms
+        );
+
+        // Create user
+        User user = new User(
+                "u123",
+                "Abhishek",
+                "abhi@example.com",
+                prefs,
+                inbox
+        );
+
+        // Register user
+        UserManager.getInstance().setUser(user);
+
+        // Create notification
+        Notification notif = new Notification(
+                "⚠️ System Alert",
+                "Your CPU is on fire.",
+                "🔥",
+                "u123"
+        );
+
+        // Add notification to inbox (which triggers dispatch)
+        user.getInbox().addNotification(notif);
+    }
+}
