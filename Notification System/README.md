@@ -17,7 +17,7 @@ Design a system that:
 - **Basic Dispatcher**: Centralized multi-channel delivery mechanism  
 - **Preferences Logic**: Each service respected individual delivery toggles
 
-### ❌ Issues in the First Design
+## ❌ Issues in the First Design
 
 1. **Singleton Abuse**  
    `UserManager` was a static singleton — poor lifecycle control, untestable.
@@ -38,7 +38,7 @@ Design a system that:
 | ❌ Services fetched users directly | Breaks DI, unclear ownership               |
 | ❌ No orchestration layer          | Dispatch was implicit; no clear coordinator|
 
-### 🔧 How Final Design Solves It
+## 🔧 How Final Design Solves It
 
 1. **Replaced Singleton with Repository Interface**  
    Introduced `UserRepository` abstraction and `InMemoryUserRepository` implementation.
