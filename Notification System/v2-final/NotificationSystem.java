@@ -1,16 +1,12 @@
 import java.util.*;
+import java.time.Instant;
 
-class UserManager {
-    private static UserManager instance = new UserManager();
-    private Map<String, User> users;
+interface UserRepository {
+    User getUser(String userId);
+}
 
-    private UserManager() {
-        this.users = new HashMap<>();
-    }
-
-    public static UserManager getInstance() {
-        return instance;
-    }
+class InMemoryUserRepository implements UserRepository {
+    private Map<String, User> users = new HashMap<>();
 
     public void setUser(User user) {
         users.put(user.getUserId(), user);
@@ -75,16 +71,13 @@ class Preferences {
 
 class Inbox {
     private List<Notification> notifications;
-    private Dispatcher dispatcher;
 
-    public Inbox(Dispatcher dispatcher) {
+    public Inbox() {
         this.notifications = new ArrayList<>();
-        this.dispatcher = dispatcher;
     }
 
     public void addNotification(Notification notification) {
         notifications.add(notification);
-        dispatcher.dispatch(notification);
     }
 }
 
@@ -93,8 +86,14 @@ interface NotificationService {
 }
 
 class EmailNotificationService implements NotificationService {
+    private UserRepository userRepository;
+
+    public EmailNotificationService(UserRepository repo) {
+        this.userRepository = repo;
+    }
+
     public void sendNotification(Notification notification) {
-        User user = UserManager.getInstance().getUser(notification.getUserId());
+        User user = userRepository.getUser(notification.getUserId());
         if (user.getPreferences().isEmailNotificationsEnabled()) {
             System.out.println("Sending email notification: " + notification.getTitle());
         }
@@ -102,8 +101,14 @@ class EmailNotificationService implements NotificationService {
 }
 
 class PushNotificationService implements NotificationService {
+    private UserRepository userRepository;
+
+    public PushNotificationService(UserRepository repo) {
+        this.userRepository = repo;
+    }
+
     public void sendNotification(Notification notification) {
-        User user = UserManager.getInstance().getUser(notification.getUserId());
+        User user = userRepository.getUser(notification.getUserId());
         if (user.getPreferences().isPushNotificationsEnabled()) {
             System.out.println("Sending push notification: " + notification.getTitle());
         }
@@ -111,8 +116,14 @@ class PushNotificationService implements NotificationService {
 }
 
 class SmsNotificationService implements NotificationService {
+    private UserRepository userRepository;
+
+    public SmsNotificationService(UserRepository repo) {
+        this.userRepository = repo;
+    }
+
     public void sendNotification(Notification notification) {
-        User user = UserManager.getInstance().getUser(notification.getUserId());
+        User user = userRepository.getUser(notification.getUserId());
         if (user.getPreferences().isSmsNotificationsEnabled()) {
             System.out.println("Sending SMS notification: " + notification.getTitle());
         }
@@ -122,11 +133,8 @@ class SmsNotificationService implements NotificationService {
 class Dispatcher {
     private List<NotificationService> notificationServices;
 
-    public Dispatcher() {
-        this.notificationServices = new ArrayList<>();
-        this.notificationServices.add(new EmailNotificationService());
-        this.notificationServices.add(new PushNotificationService());
-        this.notificationServices.add(new SmsNotificationService());
+    public Dispatcher(List<NotificationService> services) {
+        this.notificationServices = services;
     }
 
     public void dispatch(Notification notification) {
@@ -136,11 +144,27 @@ class Dispatcher {
     }
 }
 
+class NotificationSender {
+    private Dispatcher dispatcher;
+    private UserRepository userRepository;
+
+    public NotificationSender(Dispatcher dispatcher, UserRepository userRepository) {
+        this.dispatcher = dispatcher;
+        this.userRepository = userRepository;
+    }
+
+    public void send(Notification notification) {
+        User user = userRepository.getUser(notification.getUserId());
+        user.getInbox().addNotification(notification);
+        dispatcher.dispatch(notification);
+    }
+}
+
 class Notification {
     private String title;
     private String message;
     private String iconUrl;
-    private String timestamp;
+    private Instant timestamp;
     private String userId;
 
     public Notification(String title, String message, String iconUrl, String userId) {
@@ -148,7 +172,7 @@ class Notification {
         this.message = message;
         this.iconUrl = iconUrl;
         this.userId = userId;
-        this.timestamp = new Date().toString();
+        this.timestamp = Instant.now();
     }
 
     public String getTitle() {
@@ -170,11 +194,23 @@ class Notification {
 
 public class NotificationSystem {
     public static void main(String[] args) {
-        // Create dispatcher
-        Dispatcher dispatcher = new Dispatcher();
+        // Create user repository
+        InMemoryUserRepository userRepo = new InMemoryUserRepository();
 
-        // Create inbox (with dispatcher)
-        Inbox inbox = new Inbox(dispatcher);
+        // Setup notification services
+        NotificationService emailService = new EmailNotificationService(userRepo);
+        NotificationService pushService = new PushNotificationService(userRepo);
+        NotificationService smsService = new SmsNotificationService(userRepo);
+        List<NotificationService> services = Arrays.asList(emailService, pushService, smsService);
+
+        // Create dispatcher
+        Dispatcher dispatcher = new Dispatcher(services);
+
+        // Create sender
+        NotificationSender sender = new NotificationSender(dispatcher, userRepo);
+
+        // Create inbox
+        Inbox inbox = new Inbox();
 
         // Set user preferences
         Preferences prefs = new Preferences(
@@ -193,7 +229,7 @@ public class NotificationSystem {
         );
 
         // Register user
-        UserManager.getInstance().setUser(user);
+        userRepo.setUser(user);
 
         // Create notification
         Notification notif = new Notification(
@@ -202,8 +238,7 @@ public class NotificationSystem {
                 "🔥",
                 "u123"
         );
-
-        // Add notification to inbox (which triggers dispatch)
-        user.getInbox().addNotification(notif);
+        // Send notification
+        sender.send(notif);
     }
 }
